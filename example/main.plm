@@ -1,0 +1,13 @@
+let x = 5
+
+fn biprint[A](x: A): unit {
+  out(x);
+  out(x)
+}
+
+if x is Person(let age) then {
+  biprint(x)
+} else {
+  out(x)
+}
+

@@ -298,6 +298,15 @@ checkToplevel (HLIR.MkTopLoc pos t) = do
   void HLIR.popPosition
   pure $ HLIR.MkTopLoc pos t'
 checkToplevel (HLIR.MkTopType {}) = Err.compilerError "Typechecking of type declarations not implemented yet"
+checkToplevel (HLIR.MkTopNative ann args retTy code) = do
+  let generics = Set.toList ann.value
+  let scheme = HLIR.Forall generics $ map HLIR.value args HLIR.:->: retTy
+
+  modifyIORef'
+    M.checkerState
+    (\s -> s { M.variables = Map.insert ann.name scheme s.variables })
+
+  pure $ HLIR.MkTopNative ann args retTy code
 
 runTypecheckingPass :: 
   MonadIO m =>

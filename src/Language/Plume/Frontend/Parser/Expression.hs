@@ -90,7 +90,22 @@ parseExprIf = localize $ do
   void $ Lex.reserved "then"
   thenE <- parseExprFull
   void $ Lex.reserved "else"
-  HLIR.MkExprIf cond thenE <$> parseExprFull
+
+  elseE <- parseExprFull
+
+  case getExprIs cond of
+    Just (e, p) -> 
+      pure $ 
+        HLIR.MkExprMatch e [(p, thenE), (HLIR.MkPatWildcard, elseE)]
+    Nothing -> 
+      pure $ 
+        HLIR.MkExprIf cond thenE elseE
+
+  where
+    getExprIs :: HLIR.HLIR "Expression" -> Maybe (HLIR.HLIR "Expression", HLIR.HLIR "Pattern")
+    getExprIs (HLIR.MkExprIs e p) = Just (e, p)
+    getExprIs (HLIR.MkExprLoc _ e) = getExprIs e
+    getExprIs _ = Nothing
 
 -- | PARSE PATTERN
 -- Parse a pattern. A pattern is used to match values in a match expression.
@@ -298,8 +313,31 @@ parseTopFunction = localize $ do
 
   pure $ HLIR.MkTopFunction (Set.fromList generics) (HLIR.MkAnnotation name returnType) params body
 
+parseTopData :: (MonadIO m) => P.Parser m (HLIR.HLIR "Toplevel")
+parseTopData = localize $ do
+  void $ Lex.reserved "type"
+  name <- Lex.identifier
+  generics <- P.option [] $ Lex.brackets (P.sepBy Lex.identifier Lex.comma)
+
+  constructors <- Lex.braces $ P.many parseDataConstructor
+
+  pure $ HLIR.MkTopData (HLIR.MkAnnotation name generics) constructors
+  
+  where
+    parseDataConstructor :: (MonadIO m) => P.Parser m (HLIR.HLIR "DataConstructor")
+    parseDataConstructor = P.choice [
+        P.try $ do
+          name <- Lex.identifier
+          args <- Lex.parens $ P.sepBy Typ.parseType Lex.comma
+
+          pure $ HLIR.MkDataConstructor name args,
+        HLIR.MkDataVariable <$> Lex.identifier
+      ]
+
+
 parseTopFull :: (MonadIO m) => P.Parser m (HLIR.HLIR "Toplevel")
 parseTopFull = localize $ P.choice [
     parseTopFunction,
+    parseTopData,
     HLIR.MkTopExpr <$> parseStmtFull
   ]

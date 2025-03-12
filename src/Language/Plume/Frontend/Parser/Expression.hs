@@ -94,11 +94,11 @@ parseExprIf = localize $ do
   elseE <- parseExprFull
 
   case getExprIs cond of
-    Just (e, p) -> 
-      pure $ 
+    Just (e, p) ->
+      pure $
         HLIR.MkExprMatch e [(p, thenE), (HLIR.MkPatWildcard, elseE)]
-    Nothing -> 
-      pure $ 
+    Nothing ->
+      pure $
         HLIR.MkExprIf cond thenE elseE
 
   where
@@ -322,7 +322,7 @@ parseTopData = localize $ do
   constructors <- Lex.braces $ P.many parseDataConstructor
 
   pure $ HLIR.MkTopData (HLIR.MkAnnotation name generics) constructors
-  
+
   where
     parseDataConstructor :: (MonadIO m) => P.Parser m (HLIR.HLIR "DataConstructor")
     parseDataConstructor = P.choice [
@@ -334,10 +334,29 @@ parseTopData = localize $ do
         HLIR.MkDataVariable <$> Lex.identifier
       ]
 
+parseTopNative :: (MonadIO m) => P.Parser m (HLIR.HLIR "Toplevel")
+parseTopNative = localize $ do
+  void $ Lex.reserved "native"
+  void $ Lex.reserved "fn"
+  name <- Lex.identifier
+  generics <- P.option [] $ Lex.brackets (P.sepBy Lex.identifier Lex.comma)
+
+  params <- Lex.parens $ P.sepBy (parseAnnotation' Typ.parseType) Lex.comma
+
+  returnType <- P.option (HLIR.MkTyId "unit") $ Lex.symbol ":" *> Typ.parseType
+
+  code <- Lex.symbol "=" *> Lex.lexeme Lit.parseString
+
+  pure $ HLIR.MkTopNative
+      (HLIR.MkAnnotation name (Set.fromList generics))
+      params
+      returnType
+      code
 
 parseTopFull :: (MonadIO m) => P.Parser m (HLIR.HLIR "Toplevel")
 parseTopFull = localize $ P.choice [
     parseTopFunction,
+    parseTopNative,
     parseTopData,
     HLIR.MkTopExpr <$> parseStmtFull
   ]

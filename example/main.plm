@@ -1,13 +1,22 @@
-let x = 5
+type unit { unit }
+type Action[A] {
+  Print(A)
+}
 
-fn biprint[A](x: A): unit {
-  out(x);
-  out(x)
+type Person {
+  Person(int)
+}
+
+let x = Person(5)
+
+fn biprint[A](x: A): Action[A] {
+  Print(x);
+  Print(x)
 }
 
 if x is Person(let age) then {
   biprint(x)
 } else {
-  out(x)
+  Print(x)
 }
 

@@ -39,11 +39,16 @@ handle (Left (err, pos@(p1, _))) _ = liftIO $ do
         Nothing
         ("Module " <> show (normalise path) <> " not found", Just "check for typo issue with the module name", pos)
         "Resolution"
-    VariableNotFound name ->
+    VariableNotFound name Nothing ->
       printErrorFromString
         Nothing
         ("Variable " <> show name <> " not found", Just "check for typo issue with the variable", pos)
         "Resolution"
+    VariableNotFound name (Just ty) ->
+      printErrorFromString
+        Nothing
+        ("Variable " <> show name <> " not found", Just "check for typo issue with the variable", pos)
+        ("Expected type " <> toString (toText ty))
     CompilerError msg ->
       printErrorFromString
         Nothing
@@ -54,30 +59,6 @@ handle (Left (err, pos@(p1, _))) _ = liftIO $ do
         Nothing
         ("Expected " <> toString (toText expected) <> ", but got " <> toString (toText got), Nothing, pos)
         ("Expected type " <> toString (toText expected))
-
-    ActorNotFound name ->
-      printErrorFromString
-        Nothing
-        ("Actor " <> show name <> " not found", Just "check for typo issue with the event name, or missing types in actor header", pos)
-        "Resolution"
-
-    NotAnActor ty ->
-      printErrorFromString
-        Nothing
-        ("Expected an actor, but received a " <> show (toText ty), Nothing, pos)
-        "Typechecking"
-
-    EventNotFound name ->
-      printErrorFromString
-        Nothing
-        ("Event " <> show name <> " not found", Just "check for typo issue with the event name", pos)
-        "Resolution"
-
-    ExpectedAnActor ty ->
-      printErrorFromString
-        (Just "May you have forgotten to define an interface for your actor?")
-        ("Expected an actor, but got " <> show (toText ty), Nothing, pos)
-        "Typechecking"
 
     InvalidArgumentQuantity n k ->
       printErrorFromString
@@ -124,7 +105,7 @@ handle (Left (err, pos@(p1, _))) _ = liftIO $ do
 
 type ImportStack = [FilePath]
 
-type Error = (BonzaiError, HLIR.Position)
+type Error = (PlumeError, HLIR.Position)
 
 annotateErrorBundle :: ParseErrorBundle Text Void -> NonEmpty (SourcePos, Text)
 annotateErrorBundle bundle
@@ -133,17 +114,13 @@ annotateErrorBundle bundle
                        (bundleErrors bundle)
                        (bundlePosState bundle)
 
-data BonzaiError
+data PlumeError
   = ParseError P.ParseError
   | CyclicModuleDependency FilePath ImportStack
   | ModuleNotFound FilePath ImportStack
-  | VariableNotFound Text
+  | VariableNotFound Text (Maybe HLIR.Type)
   | CompilerError Text
   | UnificationFail HLIR.Type HLIR.Type
-  | ActorNotFound HLIR.Type
-  | NotAnActor HLIR.Type
-  | EventNotFound Text
-  | ExpectedAnActor HLIR.Type
   | InvalidArgumentQuantity Int Int
   | EnvironmentVariableNotFound Text
   | InvalidConstructor Text
@@ -171,7 +148,7 @@ compilerError msg = do
     putStrLn . toString $ err <> pCallstack
     exitFailure
 
-throw :: (MonadError Error m, MonadIO m) => BonzaiError -> m a
+throw :: (MonadError Error m, MonadIO m) => PlumeError -> m a
 throw e = do
   pos <- HLIR.popPosition'
   throwError (e, pos)

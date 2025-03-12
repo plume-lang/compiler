@@ -16,9 +16,11 @@ module Language.Plume.Syntax.HLIR (
 
   -- * Type family
   HLIR,
+  TLIR,
 
   -- * Pattern synonyms
-  pattern MkExprBinary
+  pattern MkExprBinary,
+  pattern MkTopLet
 ) where
 
 import Language.Plume.Syntax.Internal.Type as Ty
@@ -43,13 +45,13 @@ data Expression f t
 data Toplevel f t
   = MkTopFunction (Set Ty.QuVar) (Ann.Annotation (f t)) [Ann.Annotation (f t)] (Expression f t)
   | MkTopType (Ann.Annotation (f t)) (f t)
-  | MkTopData (Ann.Annotation [Ty.QuVar]) [DataConstructor f t]
+  | MkTopData (Ann.Annotation [Ty.QuVar]) [DataConstructor t]
   | MkTopLoc Pos.Position (Toplevel f t)
   | MkTopExpr (Expression f t)
 
-data DataConstructor f t
+data DataConstructor t
   = MkDataVariable Text
-  | MkDataConstructor Text [Ty.Type]
+  | MkDataConstructor Text [t]
 
 -- | Pattern type
 data Pattern f t 
@@ -58,17 +60,29 @@ data Pattern f t
   | MkPatDataVariant Text
   | MkPatDataConstructor Text [Pattern f t]
   | MkPatLoc Pos.Position (Pattern f t)
+  | MkPatWildcard
 
 type family HLIR (symbol :: Symbol) where
   HLIR "Expression" = Expression Maybe Ty.Type
   HLIR "Pattern" = Pattern Maybe Ty.Type
   HLIR "Type" = Maybe Ty.Type
   HLIR "Toplevel" = Toplevel Maybe Ty.Type
-  HLIR "DataConstructor" = DataConstructor Maybe Ty.Type
+  HLIR "DataConstructor" = DataConstructor Ty.Type
   HLIR _ = TypeError ('Text "Unknown HLIR type")
+
+type family TLIR (symbol :: Symbol) where
+  TLIR "Expression" = Expression Identity Ty.Type
+  TLIR "Pattern" = Pattern Identity Ty.Type
+  TLIR "Type" = Ty.Type
+  TLIR "Toplevel" = Toplevel Identity Ty.Type
+  TLIR "DataConstructor" = DataConstructor Ty.Type
+  TLIR _ = TypeError ('Text "Unknown TLIR type")
   
 pattern MkExprBinary :: Text -> Expression Maybe t -> Expression Maybe t -> Expression Maybe t
 pattern MkExprBinary op l r = MkExprApplication (MkExprVariable (MkAnnotation op Nothing)) [l, r]
+
+pattern MkTopLet :: Ann.Annotation (f t) -> Expression f t -> Expression f t -> Toplevel f t
+pattern MkTopLet a e b = MkTopExpr (MkExprLet a e b)
 
 -- LOCATE INSTANCES
 
@@ -98,10 +112,11 @@ instance (Show (f t), Show t) => Show (Pattern f t) where
   show (MkPatLiteral l) = show l
   show (MkPatVariable a) = "let " <> toString a.name
   show (MkPatDataVariant t) = toString t
-  show (MkPatDataConstructor t ps) = show t <> "(" <> intercalate ", " (map show ps) <> ")"
+  show (MkPatDataConstructor t ps) = toString t <> "(" <> intercalate ", " (map show ps) <> ")"
   show (MkPatLoc _ e) = show e
+  show MkPatWildcard = "_"
 
-instance (Show (f t), Show t) => Show (DataConstructor f t) where
+instance (Show t) => Show (DataConstructor t) where
   show (MkDataVariable t) = toString t
   show (MkDataConstructor t ps) = show t <> "(" <> intercalate ", " (map show ps) <> ")"
 
@@ -134,7 +149,7 @@ instance (Eq (f t), Eq t) => Eq (Pattern f t) where
   MkPatLoc _ e1 == MkPatLoc _ e2 = e1 == e2
   _ == _ = False
 
-instance (Eq (f t), Eq t) => Eq (DataConstructor f t) where
+instance (Eq t) => Eq (DataConstructor t) where
   MkDataVariable t1 == MkDataVariable t2 = t1 == t2
   MkDataConstructor t1 ps1 == MkDataConstructor t2 ps2 = t1 == t2 && ps1 == ps2
   _ == _ = False

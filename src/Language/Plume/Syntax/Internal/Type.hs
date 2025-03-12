@@ -97,20 +97,13 @@ pattern args :->: retTy = MkTyFun args retTy
 -- | Primitive types are the most basic types in Bonzai. They represent the
 -- | basic types such as integers, floats, characters, strings, booleans, and
 -- | unit.
-pattern MkTyInt, MkTyFloat, MkTyChar, MkTyString, MkTyBool, MkTyUnit, MkTyAny :: Type
+pattern MkTyInt, MkTyFloat, MkTyChar, MkTyString, MkTyBool, MkTyUnit :: Type
 pattern MkTyInt = MkTyId "int"
 pattern MkTyFloat = MkTyId "float"
 pattern MkTyChar = MkTyId "char"
 pattern MkTyString = MkTyId "string"
 pattern MkTyBool = MkTyId "bool"
 pattern MkTyUnit = MkTyId "unit"
-pattern MkTyAny = MkTyId "#any"
-
--- | LIVE TYPE
--- | Live type is a type that represents a live value in Bonzai. It is used to
--- | represent values that are reactive about mutations.
-pattern MkTyLive :: Type -> Type
-pattern MkTyLive a = MkTyApp (MkTyId "live") [a]
 
 -- | LIST TYPE
 -- | List type is a type that represents a list of values in Bonzai. It is used
@@ -124,13 +117,6 @@ pattern MkTyList a = MkTyApp (MkTyId "list") [a]
 pattern MkTyMutable :: Type -> Type
 pattern MkTyMutable a = MkTyApp (MkTyId "mutable") [a]
 
--- | ACTOR TYPE
--- | Actor type is a type that represents an actor in Bonzai. It is used to
--- | represent concurrent computations behind a message-passing interface. This
--- | whole system is called actor model
-pattern MkTyActor :: Type -> Type
-pattern MkTyActor a = MkTyApp (MkTyId "actor") [a]
-
 -- | TUPLE TYPE
 -- | Tuple type is a type that represents a tuple of values in Bonzai. It is used
 -- | to represent a fixed-size collection of values of different types.
@@ -140,11 +126,9 @@ pattern MkTyTuple a b = MkTyApp (MkTyId "Tuple") [a, b]
 instance ToText Type where 
   toText (MkTyId a) = a
   toText (MkTyMutable a) = T.concat ["mut ", toText a]
-  toText (MkTyLive a) = T.concat ["live ", toText a]
-  toText (MkTyActor a) = T.concat ["actor ", toText a]
-  toText (args :->: ret) = T.concat ["(", T.intercalate ", " (map toText args), ") -> ", toText ret]
+  toText (args :->: ret) = T.concat ["(", T.intercalate ", " (map toText args), ") = ", toText ret]
   toText (MkTyTuple a b) = T.concat ["(", toText a, ", ", toText b, ")"]
-  toText (MkTyApp a b) = T.concat [toText a, "<", T.intercalate ", " (map toText b), ">"]
+  toText (MkTyApp a b) = T.concat [toText a, "[", T.intercalate ", " (map toText b), "]"]
   toText (MkTyVar a) = do
     let a' = IO.unsafePerformIO $ readIORef a
     toText a'
@@ -169,7 +153,7 @@ simplify a = pure a
 
 instance ToText TyVar where
   toText (Link a) = toText a
-  toText (Unbound a l) = a <> "@" <> T.pack (show l)
+  toText (Unbound a l) = "?" <> a <> T.pack (show l)
 
 instance ToText (Maybe Type) where
   toText (Just a) = toText a

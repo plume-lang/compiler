@@ -48,6 +48,7 @@ data Toplevel f t
   | MkTopData (Ann.Annotation [Ty.QuVar]) [DataConstructor t]
   | MkTopLoc Pos.Position (Toplevel f t)
   | MkTopExpr (Expression f t)
+  | MkTopNative (Ann.Annotation (Set Ty.QuVar)) [Ann.Annotation t] t Text
 
 data DataConstructor t
   = MkDataVariable Text
@@ -118,14 +119,15 @@ instance (Show (f t), Show t) => Show (Pattern f t) where
 
 instance (Show t) => Show (DataConstructor t) where
   show (MkDataVariable t) = toString t
-  show (MkDataConstructor t ps) = show t <> "(" <> intercalate ", " (map show ps) <> ")"
+  show (MkDataConstructor t ps) = toString t <> "(" <> intercalate ", " (map show ps) <> ")"
 
 instance (Show (f t), Show t) => Show (Toplevel f t) where
   show (MkTopFunction gens a as e) = "fn " <> toString a.name <> "[" <> intercalate ", " (map toString (toList gens)) <> "](" <> intercalate "," (map show as) <> ") = " <> show e
   show (MkTopType a t) = "type " <> show a <> " = " <> show t
-  show (MkTopData a cs) = "data " <> show a <> " = " <> intercalate " | " (map show cs)
+  show (MkTopData a cs) = "type " <> toString a.name <> "[" <> intercalate "," (map toString (toList a.value)) <> "]" <> " { " <> intercalate "; " (map show cs) <> " }"
   show (MkTopLoc _ t) = show t
   show (MkTopExpr e) = show e
+  show (MkTopNative ann as t c) = "native fn " <> toString ann.name <> "[" <> intercalate ", " (map toString (toList ann.value)) <> "]" <> "(" <> intercalate ", " (map show as) <> "): " <> show t <> " = " <> show c
 
 -- EQUALITY INSTANCES
 

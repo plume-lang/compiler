@@ -1,7 +1,8 @@
 module Main where
 import Language.Plume.Frontend.Parser (parsePlumeFile)
 import Language.Plume.Frontend.Parser.Expression (parseToplevel)
-import Control.Monad.Result (showError)
+import Control.Monad.Result (showError, handle, parseError)
+import Language.Plume.Frontend.Typechecker.Checker (runTypecheckingPass)
 
 main :: IO ()
 main = do
@@ -11,5 +12,9 @@ main = do
   res <- parsePlumeFile filename fileContent parseToplevel
 
   case res of
-    Left err -> putStrLn (showError err)
-    Right ast -> mapM_ print ast
+    Left err -> parseError err filename (Just fileContent)
+    Right ast -> do
+      typedAST <- runTypecheckingPass ast
+
+      handle typedAST $ \typed -> do
+        mapM_ print typed

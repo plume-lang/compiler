@@ -1,7 +1,5 @@
 type unit { unit }
-type Action[A] {
-  Print(A)
-}
+native fn print[A](x: A) = "console.log(x)"
 
 type Person {
   Person(int)
@@ -9,14 +7,14 @@ type Person {
 
 let x = Person(5)
 
-fn biprint[A](x: A): Action[A] {
-  Print(x);
-  Print(x)
+fn biprint[A](x: A): unit {
+  print(x);
+  print(x)
 }
 
 if x is Person(let age) then {
-  biprint(x)
+  biprint(age)
 } else {
-  Print(x)
+  print(x)
 }
 

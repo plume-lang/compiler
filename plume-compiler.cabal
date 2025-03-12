@@ -72,6 +72,9 @@ library
     Language.Plume.Frontend.Parser.Internal.Literal
     Language.Plume.Frontend.Parser.Internal.Type
     Language.Plume.Frontend.Parser.Lexer
+    Language.Plume.Frontend.Typechecker.Checker
+    Language.Plume.Frontend.Typechecker.Monad
+    Language.Plume.Frontend.Typechecker.Unification
     Language.Plume.Syntax.HLIR
     Language.Plume.Syntax.Internal.Annotation
     Language.Plume.Syntax.Internal.Literal

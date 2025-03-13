@@ -109,6 +109,14 @@ instantiateWithSub s (HLIR.Forall qvars ty) = do
         HLIR.Unbound name _ -> case Map.lookup name subst of
           Just t -> pure (t, subst)
           Nothing -> pure (HLIR.MkTyVar ref, subst)
+    go subst (HLIR.MkTyRowExtend label ty' row) = do
+      (ty'', subst') <- go subst ty'
+      (row', subst'') <- go subst' row
+      pure (HLIR.MkTyRowExtend label ty'' row', subst'')
+    go subst (HLIR.MkTyRecord row) = do
+      (row', subst') <- go subst row
+      pure (HLIR.MkTyRecord row', subst')
+    go subst HLIR.MkTyRowEmpty = pure (HLIR.MkTyRowEmpty, subst)
 
     goMany :: (MonadChecker m) => Substitution -> [HLIR.Type] -> m ([HLIR.Type], Substitution)
     goMany subst (x : xs) = do

@@ -54,6 +54,18 @@ unifiesWith t t' = do
         unifiesWith t1a t2a
         zipWithM_ unifiesWith t1b t2b
       (HLIR.MkTyId n, HLIR.MkTyId n') | n == n' -> pure ()
+      (HLIR.MkTyRecord t1', HLIR.MkTyRecord t2') -> unifiesWith t1' t2'
+      (HLIR.MkTyRowEmpty, HLIR.MkTyRowEmpty) -> pure ()
+      (HLIR.MkTyRowExtend label1 fieldTy1 rowTail1, row2@HLIR.MkTyRowExtend {}) -> do
+        (fieldTy2, rowTail2) <- rewriteRow row2 label1
+        -- ^ apply side-condition to ensure termination
+        case snd $ toList' rowTail1 of
+          Just tv -> do
+            b <- liftIO $ doesOccurB tv fieldTy2
+            when b $ M.throw (M.UnificationFail t1 t2)
+          _ -> do
+            unifiesWith fieldTy1 fieldTy2
+            unifiesWith rowTail1 rowTail2
       _ -> M.throw (M.UnificationFail t1 t2)
 
 -- | Check to see if two types can be unified without
@@ -62,3 +74,29 @@ doesUnifyWith :: M.MonadChecker m => HLIR.Type -> HLIR.Type -> m Bool
 doesUnifyWith t t' = runExceptT (unifiesWith t t') >>= \case
   Left _ -> pure False
   Right _ -> pure True
+
+rewriteRow :: M.MonadChecker m => HLIR.Type -> Text -> m (HLIR.Type, HLIR.Type)
+rewriteRow HLIR.MkTyRowEmpty newLabel = M.throw $ M.CannotInsertLabel newLabel
+rewriteRow (HLIR.MkTyRowExtend label fieldTy rowTail) newLabel
+  | newLabel == label = return (fieldTy, rowTail) -- ^ nothing to do
+  | alpha@(HLIR.MkTyVar _) <- rowTail = do
+      beta <- M.fresh
+      gamma <- M.fresh
+
+      alpha `unifiesWith` HLIR.MkTyRowExtend newLabel gamma beta
+
+      return (gamma, HLIR.MkTyRowExtend label fieldTy beta)
+  | otherwise = do
+      (fieldTy', rowTail') <- rewriteRow rowTail newLabel
+      
+      return (fieldTy', HLIR.MkTyRowExtend label fieldTy rowTail')
+rewriteRow ty _ = M.throw $ M.UnexpectedRowType ty
+
+toList' :: HLIR.Type -> ([(Text, HLIR.Type)], Maybe (IORef HLIR.TyVar))
+toList' (HLIR.MkTyVar r) = ([], Just r)
+toList' HLIR.MkTyRowEmpty = ([], Nothing)
+toList' (HLIR.MkTyRowExtend l t r) = 
+  let (ls, mv) = toList' r
+    in ((l, t):ls, mv)
+toList' (HLIR.MkTyRecord r) = toList' r
+toList' _ = M.compilerError "toList' called on non-row type"

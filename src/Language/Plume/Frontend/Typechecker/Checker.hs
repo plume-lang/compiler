@@ -72,6 +72,34 @@ check (HLIR.MkExprLiteral l) ty = do
   M.unifiesWith ty lTy
 
   pure $ HLIR.MkExprLiteral l
+check (HLIR.MkExprList es) (HLIR.MkTyList ty) = do
+  es' <- mapM (`check` ty) es
+
+  pure $ HLIR.MkExprList es'
+check (HLIR.MkExprRecordAccess e k) ty = do
+  r <- M.fresh
+
+  e' <- check e (HLIR.MkTyRecord $ HLIR.MkTyRowExtend k ty r)
+
+  pure $ HLIR.MkExprRecordAccess e' k
+check (HLIR.MkExprRecordRestrict e k) ty = do
+  a <- M.fresh
+
+  e' <- check e (HLIR.MkTyRecord $ HLIR.MkTyRowExtend k a ty)
+
+  pure $ HLIR.MkExprRecordRestrict e' k
+-- check (HLIR.MkExprRecordExtend e k v) ty = do
+--   a <- M.fresh
+
+--   (e', recTy) <- synthesize e
+
+--   v' <- check v a
+
+--   print (recTy, a, ty)
+
+--   M.unifiesWith (HLIR.MkTyRecord $ HLIR.MkTyRowExtend k a recTy) ty
+
+--   pure $ HLIR.MkExprRecordExtend e' k v'
 check e ty = do
   (e', eTy) <- synthesize e
   M.unifiesWith eTy ty
@@ -174,6 +202,58 @@ synthesize (HLIR.MkExprLiteral l) = do
   let lTy = typeOfLit l
 
   pure (HLIR.MkExprLiteral l, lTy)
+synthesize (HLIR.MkExprList es) = do
+  case es of
+    [] -> do
+      ty <- M.fresh
+      pure (HLIR.MkExprList [], HLIR.MkTyList ty)
+    (x : xs) -> do
+      (x', ty) <- synthesize x
+      xs' <- mapM (`check` ty) xs
+
+      pure (HLIR.MkExprList (x' : xs'), HLIR.MkTyList ty)
+synthesize (HLIR.MkExprRecordAccess e k) = do
+  (e', ty) <- synthesize e
+
+  a <- M.fresh
+  r <- M.fresh
+
+  let funTy = [HLIR.MkTyRecord $ HLIR.MkTyRowExtend k a r] HLIR.:->: a
+
+  ret <- M.fresh
+
+  M.unifiesWith ([ty] HLIR.:->: ret) funTy
+
+  pure (HLIR.MkExprRecordAccess e' k, ret)
+synthesize (HLIR.MkExprRecordRestrict e k) = do
+  a <- M.fresh
+  r <- M.fresh
+
+  let funTy = [HLIR.MkTyRecord $ HLIR.MkTyRowExtend k a r] HLIR.:->: HLIR.MkTyRecord r
+
+  (recExpr, recTy) <- synthesize e
+
+  ret <- M.fresh
+
+  M.unifiesWith ([recTy] HLIR.:->: ret) funTy
+
+  pure (HLIR.MkExprRecordRestrict recExpr k, ret)
+synthesize (HLIR.MkExprRecordExtend e k v) = do
+  (e', ty) <- synthesize e
+  (v', vTy) <- synthesize v
+
+  a <- M.fresh
+  r <- M.fresh
+
+  let funTy = [a, HLIR.MkTyRecord r] HLIR.:->: HLIR.MkTyRecord (HLIR.MkTyRowExtend k a r)
+
+  ret <- M.fresh
+
+  M.unifiesWith ([vTy, ty] HLIR.:->: ret) funTy
+
+  pure (HLIR.MkExprRecordExtend e' k v', ret)
+synthesize HLIR.MkExprRecordEmpty = 
+  pure (HLIR.MkExprRecordEmpty, HLIR.MkTyRecord HLIR.MkTyRowEmpty)
 
 typeOfLit :: HLIR.Literal -> HLIR.Type
 typeOfLit (HLIR.MkLitInt _) = HLIR.MkTyInt
@@ -211,7 +291,7 @@ checkPattern (HLIR.MkPatDataConstructor t ps) ty = do
       case ty' of
         patArgsTys HLIR.:->: retTy -> do
           ps' <- zipWithM checkPattern ps patArgsTys
-          M.unifiesWith retTy ty 
+          M.unifiesWith retTy ty
 
           pure (HLIR.MkPatDataConstructor t (map fst ps'), Map.unions (map snd ps'))
         _ -> M.throw (Err.InvalidConstructor t)
@@ -236,7 +316,7 @@ checkToplevel (HLIR.MkTopLet var expr body) = do
   M.unifiesWith varTy exprTy
 
   modifyIORef'
-    M.checkerState 
+    M.checkerState
     (\s -> s { M.variables = Map.insert var.name (HLIR.Forall [] exprTy) s.variables })
 
   (body', _) <- synthesize body
@@ -246,7 +326,7 @@ checkToplevel (HLIR.MkTopExpr expr) = do
   (expr', _) <- synthesize expr
   pure $ HLIR.MkTopExpr expr'
 checkToplevel (HLIR.MkTopData t cs) = do
-  let header 
+  let header
         | null t.value = HLIR.MkTyId t.name
         | otherwise = HLIR.MkTyApp (HLIR.MkTyId t.name) (map HLIR.MkTyQuantified t.value)
   let generics = Set.fromList t.value
@@ -276,8 +356,8 @@ checkToplevel (HLIR.MkTopFunction generics ann args body) = do
   let vars' = Map.map (HLIR.Forall [] . runIdentity) vars
 
   (finalExpr, ty) <- M.with
-    M.checkerState 
-    (\s -> s { M.variables = Map.union vars' s.variables }) 
+    M.checkerState
+    (\s -> s { M.variables = Map.union vars' s.variables })
     $ do
       (body', ty) <- case ann.value of
         Just t -> (,t) <$> check body t
@@ -287,8 +367,8 @@ checkToplevel (HLIR.MkTopFunction generics ann args body) = do
 
   let finalTy = HLIR.Forall generics' $ map (runIdentity . HLIR.value) args' HLIR.:->: ty
 
-  modifyIORef' 
-    M.checkerState 
+  modifyIORef'
+    M.checkerState
     (\s -> s { M.variables = Map.insert ann.name finalTy s.variables })
 
   pure finalExpr
@@ -308,7 +388,7 @@ checkToplevel (HLIR.MkTopNative ann args retTy code) = do
 
   pure $ HLIR.MkTopNative ann args retTy code
 
-runTypecheckingPass :: 
+runTypecheckingPass ::
   MonadIO m =>
   [HLIR.HLIR "Toplevel"] ->
   m (Either M.Error [HLIR.TLIR "Toplevel"])

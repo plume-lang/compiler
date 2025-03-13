@@ -41,6 +41,11 @@ data Expression f t
   | MkExprIf (Expression f t) (Expression f t) (Expression f t)
   | MkExprLoc Pos.Position (Expression f t)
   | MkExprIs (Expression f t) (Pattern f t)
+  | MkExprList [Expression f t]
+  | MkExprRecordEmpty
+  | MkExprRecordAccess (Expression f t) Text
+  | MkExprRecordRestrict (Expression f t) Text
+  | MkExprRecordExtend (Expression f t) Text (Expression f t)
 
 data Toplevel f t
   = MkTopFunction (Set Ty.QuVar) (Ann.Annotation (f t)) [Ann.Annotation (f t)] (Expression f t)
@@ -108,6 +113,11 @@ instance (Show (f t), Show t) => Show (Expression f t) where
   show (MkExprIf e1 e2 e3) = "if " <> show e1 <> " then " <> show e2 <> " else " <> show e3
   show (MkExprLoc _ e) = show e
   show (MkExprIs e p) = show e <> " is " <> show p
+  show (MkExprList es) = "[" <> intercalate ", " (map show es) <> "]"
+  show MkExprRecordEmpty = "{}"
+  show (MkExprRecordAccess e k) = show e <> "." <> toString k
+  show (MkExprRecordRestrict e k) = show e <> " - " <> toString k
+  show (MkExprRecordExtend e k v) = show e <> " <> " <> toString k <> ": " <> show v
 
 instance (Show (f t), Show t) => Show (Pattern f t) where
   show (MkPatLiteral l) = show l

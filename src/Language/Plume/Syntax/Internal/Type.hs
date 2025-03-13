@@ -32,6 +32,9 @@ data Type
   | MkTyApp Type [Type]
   | MkTyVar (IORef TyVar)
   | MkTyQuantified Text
+  | MkTyRowEmpty
+  | MkTyRowExtend Text Type Type
+  | MkTyRecord Type
   deriving (Ord, Generic)
 
 -- | ORD INSTANCE FOR TYPE
@@ -133,6 +136,9 @@ instance ToText Type where
     let a' = IO.unsafePerformIO $ readIORef a
     toText a'
   toText (MkTyQuantified a) = a
+  toText MkTyRowEmpty = "{}"
+  toText (MkTyRowExtend a b c) = T.concat [a, ": ", toText b, " | ", toText c]
+  toText (MkTyRecord a) = T.concat ["{", toText a, "}"]
 
 -- | TYPE SIMPLIFICATION
 -- | Given a type, simplify it by following the links of type variables until

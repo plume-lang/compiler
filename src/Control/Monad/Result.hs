@@ -102,6 +102,18 @@ handle (Left (err, pos@(p1, _))) _ = liftIO $ do
         ("Expected mutable type", Nothing, pos)
         "Resolution"
 
+    CannotInsertLabel l ->
+      printErrorFromString
+        Nothing
+        ("Cannot insert or select label " <> show l, Nothing, pos)
+        "Check if the label is present in the record"
+    
+    UnexpectedRowType ty ->
+      printErrorFromString
+        Nothing
+        ("Unexpected row type " <> show (toText ty), Nothing, pos)
+        "Resolution"
+
 
 type ImportStack = [FilePath]
 
@@ -128,6 +140,8 @@ data PlumeError
   | InvalidPatternUnion (Set Text) (Set Text)
   | InvalidHeader HLIR.Type
   | InvalidUpdate
+  | CannotInsertLabel Text
+  | UnexpectedRowType HLIR.Type
   deriving (Eq, Generic)
 
 showError :: P.ParseError -> String

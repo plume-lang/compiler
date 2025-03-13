@@ -2,7 +2,7 @@ type unit { unit }
 native fn print[A](x: A) = "console.log(x)"
 
 type Person {
-  Person(int)
+  Person(age: int)
 }
 
 let x = Person(5)

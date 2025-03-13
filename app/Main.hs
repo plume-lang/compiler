@@ -1,12 +1,12 @@
 module Main where
 import Language.Plume.Frontend.Parser (parsePlumeFile)
 import Language.Plume.Frontend.Parser.Expression (parseToplevel)
-import Control.Monad.Result (showError, handle, parseError)
+import Control.Monad.Result (handle, parseError)
 import Language.Plume.Frontend.Typechecker.Checker (runTypecheckingPass)
 
 main :: IO ()
 main = do
-  let filename = "example/main.plm"
+  let filename = "example/core/records.plm"
   fileContent <- decodeUtf8 <$> readFileBS filename
 
   res <- parsePlumeFile filename fileContent parseToplevel

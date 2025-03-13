@@ -1,0 +1,14 @@
+type unit { unit }
+native fn print[A](x: A) = "console.log(x)"
+
+fn printZ[A, Rec](r: { z: A | Rec }): unit {
+  print(r.z)
+}
+
+let r1 = { x: 1, y: 2, z: 3 }
+
+printZ(r1)
+
+let r2 = r1 \ z
+
+printZ(r2)

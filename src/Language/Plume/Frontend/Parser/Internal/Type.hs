@@ -54,10 +54,7 @@ parseType =
       void $ Lex.symbol "{"
       fields <- P.option [] $ P.sepBy1 parseField Lex.comma
 
-      rest <- P.optional $ do
-        void $ Lex.symbol ","
-        void $ Lex.symbol "..."
-        parseType
+      rest <- P.optional $ Lex.symbol "|" *> parseType
       
       void $ Lex.symbol "}"
 

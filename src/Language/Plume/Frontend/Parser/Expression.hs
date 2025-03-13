@@ -128,8 +128,7 @@ parseExprRecord = localize $ do
   void $ Lex.symbol "{"
   fields <- P.sepBy parseField Lex.comma
   rest <- P.optional $ do
-    void $ Lex.symbol ","
-    void $ Lex.symbol "..."
+    void $ Lex.symbol "|"
     parseExprFull
   void $ Lex.symbol "}"
 
